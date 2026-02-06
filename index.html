@@ -109,6 +109,12 @@
                 class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
                 placeholder="例：工程部" @keyup.enter="addEmployee">
             </div>
+            <div>
+              <label class="block text-sm font-medium text-gray-700 mb-1">權重</label>
+              <input v-model.number="newEmployee.weight" type="number" min="1"
+                class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:ring-2 focus:ring-red-500 focus:border-transparent"
+                placeholder="預設 1，數字越大中獎機率越高" @keyup.enter="addEmployee">
+            </div>
             <button @click="addEmployee"
               class="w-full bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition font-medium">
               新增員工
@@ -118,7 +124,7 @@
           <!-- CSV Upload -->
           <div class="mt-6 pt-6 border-t">
             <h3 class="text-sm font-semibold text-gray-700 mb-2">批次匯入 (CSV)</h3>
-            <p class="text-xs text-gray-500 mb-3">格式：員工編號,姓名,部門（每行一筆）</p>
+            <p class="text-xs text-gray-500 mb-3">格式：員工編號,姓名,部門,權重（每行一筆，權重可省略預設為1）</p>
             <label class="flex items-center justify-center w-full h-24 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-red-400 hover:bg-red-50 transition">
               <div class="text-center">
                 <p class="text-sm text-gray-600">點擊上傳 CSV 檔案</p>
@@ -133,7 +139,7 @@
             <h3 class="text-sm font-semibold text-gray-700 mb-2">批次文字輸入</h3>
             <textarea v-model="bulkEmployeeText" rows="4"
               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-red-500 focus:border-transparent"
-              placeholder="每行一筆，格式：員工編號,姓名,部門&#10;EMP001,王小明,工程部&#10;EMP002,李小華,行銷部"></textarea>
+              placeholder="每行一筆，格式：員工編號,姓名,部門,權重&#10;EMP001,王小明,工程部,1&#10;EMP002,李小華,行銷部,3"></textarea>
             <button @click="importBulkEmployees"
               class="mt-2 w-full bg-gray-700 text-white py-2 rounded-lg hover:bg-gray-800 transition text-sm font-medium">
               批次新增
@@ -171,6 +177,7 @@
                 <span class="text-xs text-gray-400 mr-2">{{ emp.id }}</span>
                 <span class="font-medium text-gray-800">{{ emp.name }}</span>
                 <span class="text-xs text-gray-500 ml-2" v-if="emp.dept">{{ emp.dept }}</span>
+                <span class="text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded ml-2" v-if="emp.weight > 1">x{{ emp.weight }}</span>
               </div>
               <button @click="removeEmployee(idx)"
                 class="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition text-sm">
@@ -423,7 +430,7 @@ createApp({
 
     // Employees
     const employees = ref([])
-    const newEmployee = ref({ id: '', name: '', dept: '' })
+    const newEmployee = ref({ id: '', name: '', dept: '', weight: 1 })
     const bulkEmployeeText = ref('')
 
     // Prizes
@@ -493,8 +500,9 @@ createApp({
         id,
         name,
         dept: newEmployee.value.dept.trim(),
+        weight: Math.max(1, newEmployee.value.weight || 1),
       })
-      newEmployee.value = { id: '', name: '', dept: '' }
+      newEmployee.value = { id: '', name: '', dept: '', weight: 1 }
       showToast(`已新增 ${name}`)
     }
 
@@ -512,7 +520,7 @@ createApp({
     function parseCSVLine(line) {
       const parts = line.split(',').map(s => s.trim())
       if (parts.length >= 2) {
-        return { id: parts[0], name: parts[1], dept: parts[2] || '' }
+        return { id: parts[0], name: parts[1], dept: parts[2] || '', weight: Math.max(1, parseInt(parts[3]) || 1) }
       }
       return null
     }
@@ -559,8 +567,8 @@ createApp({
     }
 
     function exportEmployeesCSV() {
-      const header = '員工編號,姓名,部門'
-      const rows = employees.value.map(e => `${e.id},${e.name},${e.dept}`)
+      const header = '員工編號,姓名,部門,權重'
+      const rows = employees.value.map(e => `${e.id},${e.name},${e.dept},${e.weight || 1}`)
       downloadCSV([header, ...rows].join('\n'), 'employees.csv')
       showToast('已匯出員工名單')
     }
@@ -650,12 +658,18 @@ createApp({
       setTimeout(() => {
         clearInterval(spinInterval)
 
-        // Pick random winners
+        // Pick weighted random winners
         const winners = []
         const poolCopy = [...availableEmployees.value]
         for (let i = 0; i < count; i++) {
           if (poolCopy.length === 0) break
-          const idx = Math.floor(Math.random() * poolCopy.length)
+          const totalWeight = poolCopy.reduce((sum, e) => sum + (e.weight || 1), 0)
+          let rand = Math.random() * totalWeight
+          let idx = 0
+          for (let j = 0; j < poolCopy.length; j++) {
+            rand -= (poolCopy[j].weight || 1)
+            if (rand <= 0) { idx = j; break }
+          }
           const winner = poolCopy.splice(idx, 1)[0]
           winners.push({
             prize: selectedPrize.value.name,
