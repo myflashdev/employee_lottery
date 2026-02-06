@@ -334,8 +334,8 @@
           </div>
         </div>
 
-        <!-- Draw Button -->
-        <div class="text-center">
+        <!-- Draw Button & Fair Mode Toggle -->
+        <div class="flex flex-col items-center gap-4">
           <button @click="startDraw"
             :disabled="!canDraw"
             class="px-12 py-4 text-xl font-bold rounded-2xl shadow-lg transition-all transform hover:scale-105 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:transform-none"
@@ -344,11 +344,23 @@
               : 'bg-gradient-to-r from-red-600 to-orange-500 text-white hover:from-red-700 hover:to-orange-600'">
             {{ isSpinning ? '抽獎中...' : '🎲 開始抽獎' }}
           </button>
+
+          <!-- Fair Mode Toggle -->
+          <label class="flex items-center gap-2 cursor-pointer select-none">
+            <div class="relative">
+              <input type="checkbox" v-model="fairMode" class="sr-only peer">
+              <div class="w-10 h-5 bg-gray-300 rounded-full peer-checked:bg-blue-500 transition"></div>
+              <div class="absolute left-0.5 top-0.5 w-4 h-4 bg-white rounded-full shadow transition-transform peer-checked:translate-x-5"></div>
+            </div>
+            <span class="text-sm text-gray-600">公平模式</span>
+            <span class="text-xs text-gray-400">（忽略權重，已中獎者可重複參加）</span>
+          </label>
         </div>
 
         <!-- Cannot Draw Warnings -->
         <div class="text-center mt-4" v-if="!canDraw && !isSpinning">
-          <p class="text-sm text-red-500" v-if="availableEmployees.length === 0">沒有可抽的員工了</p>
+          <p class="text-sm text-red-500" v-if="employees.length === 0">尚未新增任何員工</p>
+          <p class="text-sm text-red-500" v-else-if="!fairMode && availableEmployees.length === 0">沒有可抽的員工了（可開啟公平模式允許重複中獎）</p>
           <p class="text-sm text-red-500" v-else-if="selectedPrizeIndex === -1">請先選擇獎項</p>
           <p class="text-sm text-red-500" v-else-if="selectedPrize && selectedPrize.remaining <= 0">此獎項已抽完</p>
         </div>
@@ -441,6 +453,7 @@ createApp({
     // Draw
     const selectedPrizeIndex = ref(-1)
     const drawCount = ref(1)
+    const fairMode = ref(false)
     const isSpinning = ref(false)
     const spinningName = ref('')
     const lastWinners = ref([])
@@ -623,17 +636,21 @@ createApp({
 
     // ---- Draw ----
     const wonEmployeeIds = computed(() => new Set(results.value.map(r => r.employee.id)))
-    const availableEmployees = computed(() => employees.value.filter(e => !wonEmployeeIds.value.has(e.id)))
+    const availableEmployees = computed(() =>
+      fairMode.value
+        ? [...employees.value]
+        : employees.value.filter(e => !wonEmployeeIds.value.has(e.id))
+    )
     const maxDrawCount = computed(() => {
       if (!selectedPrize.value) return 1
-      return Math.min(selectedPrize.value.remaining, availableEmployees.value.length)
+      return Math.min(selectedPrize.value.remaining, fairMode.value ? employees.value.length : availableEmployees.value.length)
     })
     const canDraw = computed(() =>
       !isSpinning.value &&
       selectedPrizeIndex.value >= 0 &&
       selectedPrize.value &&
       selectedPrize.value.remaining > 0 &&
-      availableEmployees.value.length > 0
+      (fairMode.value ? employees.value.length > 0 : availableEmployees.value.length > 0)
     )
 
     watch(maxDrawCount, (val) => {
@@ -649,28 +666,36 @@ createApp({
       const count = Math.min(drawCount.value || 1, maxDrawCount.value)
 
       // Spinning animation
-      const pool = [...availableEmployees.value]
+      const drawPool = fairMode.value ? [...employees.value] : [...availableEmployees.value]
       let spinInterval = setInterval(() => {
-        spinningName.value = pool[Math.floor(Math.random() * pool.length)].name
+        spinningName.value = drawPool[Math.floor(Math.random() * drawPool.length)].name
       }, 60)
 
       // Stop after 2 seconds
+      const isFair = fairMode.value
       setTimeout(() => {
         clearInterval(spinInterval)
 
-        // Pick weighted random winners
+        // Pick winners
         const winners = []
-        const poolCopy = [...availableEmployees.value]
+        const poolCopy = isFair ? [...employees.value] : [...availableEmployees.value]
         for (let i = 0; i < count; i++) {
           if (poolCopy.length === 0) break
-          const totalWeight = poolCopy.reduce((sum, e) => sum + (e.weight || 1), 0)
-          let rand = Math.random() * totalWeight
-          let idx = 0
-          for (let j = 0; j < poolCopy.length; j++) {
-            rand -= (poolCopy[j].weight || 1)
-            if (rand <= 0) { idx = j; break }
+          let idx
+          if (isFair) {
+            // Fair mode: equal probability, allow duplicates
+            idx = Math.floor(Math.random() * poolCopy.length)
+          } else {
+            // Weighted mode
+            const totalWeight = poolCopy.reduce((sum, e) => sum + (e.weight || 1), 0)
+            let rand = Math.random() * totalWeight
+            idx = 0
+            for (let j = 0; j < poolCopy.length; j++) {
+              rand -= (poolCopy[j].weight || 1)
+              if (rand <= 0) { idx = j; break }
+            }
           }
-          const winner = poolCopy.splice(idx, 1)[0]
+          const winner = isFair ? poolCopy[idx] : poolCopy.splice(idx, 1)[0]
           winners.push({
             prize: selectedPrize.value.name,
             employee: { ...winner },
@@ -761,7 +786,7 @@ createApp({
       addEmployee, removeEmployee, clearEmployees, importEmployeesCSV, importBulkEmployees, exportEmployeesCSV,
       prizes, newPrize, bulkPrizeText, totalPrizeCount, totalRemainingPrizes,
       addPrize, removePrize, clearPrizes, importBulkPrizes,
-      selectedPrizeIndex, selectedPrize, drawCount, maxDrawCount,
+      selectedPrizeIndex, selectedPrize, drawCount, maxDrawCount, fairMode,
       isSpinning, spinningName, lastWinners, canDraw, startDraw,
       availableEmployees, confetti,
       results, groupedResults, clearResults, exportResultsCSV,
