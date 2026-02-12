@@ -1,129 +1,240 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="zh-TW">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>QR Code 產生器</title>
-  <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #f5f5f5; min-height: 100vh; padding: 20px; }
-    .container { max-width: 600px; margin: 0 auto; }
-    h1 { text-align: center; color: #333; margin-bottom: 24px; font-size: 24px; }
-    .card { background: #fff; border-radius: 8px; padding: 24px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .input-group { display: flex; gap: 8px; }
-    input[type="text"] { flex: 1; padding: 12px; border: 1px solid #ddd; border-radius: 6px; font-size: 16px; }
-    input[type="text"]:focus { outline: none; border-color: #4a90d9; }
-    button { padding: 12px 24px; background: #4a90d9; color: #fff; border: none; border-radius: 6px; font-size: 16px; cursor: pointer; white-space: nowrap; }
-    button:hover { background: #3a7bc8; }
-    button:disabled { background: #ccc; cursor: not-allowed; }
-    .qr-output { text-align: center; margin-top: 20px; min-height: 50px; }
-    .qr-output canvas { border: 8px solid #fff; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
-    .history-title { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
-    .history-title h2 { font-size: 16px; color: #666; }
-    .clear-btn { font-size: 12px; padding: 4px 10px; background: #e74c3c; }
-    .clear-btn:hover { background: #c0392b; }
-    .history-list { max-height: 200px; overflow-y: auto; }
-    .history-item { padding: 10px; background: #f9f9f9; border-radius: 4px; margin-bottom: 8px; cursor: pointer; font-size: 14px; color: #555; word-break: break-all; }
-    .history-item:hover { background: #eef5fc; }
-    .empty { text-align: center; color: #aaa; padding: 20px; font-size: 14px; }
-    a.back { display: inline-block; margin-bottom: 16px; color: #4a90d9; text-decoration: none; font-size: 14px; }
-    a.back:hover { text-decoration: underline; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <a href="index.html" class="back">← 返回入口頁</a>
-    <h1>QR Code 產生器</h1>
-
-    <div class="card">
-      <div class="input-group">
-        <input type="text" id="textInput" placeholder="輸入文字或網址..." autofocus>
-        <button id="generateBtn" onclick="generateQR()">產生</button>
-      </div>
-      <div class="qr-output" id="qrOutput"></div>
-    </div>
-
-    <div class="card">
-      <div class="history-title">
-        <h2>歷史紀錄</h2>
-        <button class="clear-btn" onclick="clearHistory()">清除</button>
-      </div>
-      <div class="history-list" id="historyList"></div>
-    </div>
-  </div>
-
-  <script>
-    const STORAGE_KEY = 'qrcode-history';
-    const input = document.getElementById('textInput');
-    const output = document.getElementById('qrOutput');
-    const historyList = document.getElementById('historyList');
-    let qr = null;
-
-    function generateQR() {
-      const text = input.value.trim();
-      if (!text) return;
-
-      output.innerHTML = '';
-      qr = new QRCode(output, {
-        text: text,
-        width: 200,
-        height: 200,
-        colorDark: '#000000',
-        colorLight: '#ffffff',
-        correctLevel: QRCode.CorrectLevel.M
-      });
-
-      saveToHistory(text);
-    }
-
-    function saveToHistory(text) {
-      let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-      history = history.filter(item => item !== text);
-      history.unshift(text);
-      if (history.length > 20) history = history.slice(0, 20);
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
-      renderHistory();
-    }
-
-    function loadHistory() {
-      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-    }
-
-    function renderHistory() {
-      const history = loadHistory();
-      if (history.length === 0) {
-        historyList.innerHTML = '<div class="empty">尚無紀錄</div>';
-        return;
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QR Code 產生器</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
       }
-      historyList.innerHTML = history.map(item =>
-        `<div class="history-item" onclick="useHistory('${item.replace(/'/g, "\\'")}')">${escapeHtml(item)}</div>`
-      ).join('');
-    }
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        background: #f5f5f5;
+        min-height: 100vh;
+        padding: 20px;
+      }
+      .container {
+        max-width: 600px;
+        margin: 0 auto;
+      }
+      h1 {
+        text-align: center;
+        color: #333;
+        margin-bottom: 24px;
+        font-size: 24px;
+      }
+      .card {
+        background: #fff;
+        border-radius: 8px;
+        padding: 24px;
+        margin-bottom: 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+      .input-group {
+        display: flex;
+        gap: 8px;
+      }
+      input[type="text"] {
+        flex: 1;
+        padding: 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-size: 16px;
+      }
+      input[type="text"]:focus {
+        outline: none;
+        border-color: #4a90d9;
+      }
+      button {
+        padding: 12px 24px;
+        background: #4a90d9;
+        color: #fff;
+        border: none;
+        border-radius: 6px;
+        font-size: 16px;
+        cursor: pointer;
+        white-space: nowrap;
+      }
+      button:hover {
+        background: #3a7bc8;
+      }
+      button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+      }
+      .qr-output {
+        text-align: center;
+        margin-top: 20px;
+        min-height: 50px;
+      }
+      .qr-output canvas {
+        border: 8px solid #fff;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      }
+      .history-title {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 12px;
+      }
+      .history-title h2 {
+        font-size: 16px;
+        color: #666;
+      }
+      .clear-btn {
+        font-size: 12px;
+        padding: 4px 10px;
+        background: #e74c3c;
+      }
+      .clear-btn:hover {
+        background: #c0392b;
+      }
+      .history-list {
+        max-height: 200px;
+        overflow-y: auto;
+      }
+      .history-item {
+        padding: 10px;
+        background: #f9f9f9;
+        border-radius: 4px;
+        margin-bottom: 8px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #555;
+        word-break: break-all;
+      }
+      .history-item:hover {
+        background: #eef5fc;
+      }
+      .empty {
+        text-align: center;
+        color: #aaa;
+        padding: 20px;
+        font-size: 14px;
+      }
+      a.back {
+        display: inline-block;
+        margin-bottom: 16px;
+        color: #4a90d9;
+        text-decoration: none;
+        font-size: 14px;
+      }
+      a.back:hover {
+        text-decoration: underline;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <a href="index.html" class="back">← 返回入口頁</a><br />
+      <a
+        href="https://esimsetup.apple.com/esim_qrcode_provisioning?carddata=LPA:1$smdp.io$K2-2O3BAX-1U7DQPF"
+        class="back"
+        >← 點擊安裝</a
+      >
+      <h1>QR Code 產生器</h1>
 
-    function useHistory(text) {
-      input.value = text;
-      generateQR();
-    }
+      <div class="card">
+        <div class="input-group">
+          <input
+            type="text"
+            id="textInput"
+            placeholder="輸入文字或網址..."
+            autofocus
+          />
+          <button id="generateBtn" onclick="generateQR()">產生</button>
+        </div>
+        <div class="qr-output" id="qrOutput"></div>
+      </div>
 
-    function clearHistory() {
-      if (confirm('確定要清除所有歷史紀錄嗎？')) {
-        localStorage.removeItem(STORAGE_KEY);
+      <div class="card">
+        <div class="history-title">
+          <h2>歷史紀錄</h2>
+          <button class="clear-btn" onclick="clearHistory()">清除</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+    </div>
+
+    <script>
+      const STORAGE_KEY = "qrcode-history";
+      const input = document.getElementById("textInput");
+      const output = document.getElementById("qrOutput");
+      const historyList = document.getElementById("historyList");
+      let qr = null;
+
+      function generateQR() {
+        const text = input.value.trim();
+        if (!text) return;
+
+        output.innerHTML = "";
+        qr = new QRCode(output, {
+          text: text,
+          width: 200,
+          height: 200,
+          colorDark: "#000000",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M,
+        });
+
+        saveToHistory(text);
+      }
+
+      function saveToHistory(text) {
+        let history = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+        history = history.filter((item) => item !== text);
+        history.unshift(text);
+        if (history.length > 20) history = history.slice(0, 20);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(history));
         renderHistory();
       }
-    }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
+      function loadHistory() {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      }
 
-    input.addEventListener('keydown', function(e) {
-      if (e.key === 'Enter') generateQR();
-    });
+      function renderHistory() {
+        const history = loadHistory();
+        if (history.length === 0) {
+          historyList.innerHTML = '<div class="empty">尚無紀錄</div>';
+          return;
+        }
+        historyList.innerHTML = history
+          .map(
+            (item) =>
+              `<div class="history-item" onclick="useHistory('${item.replace(/'/g, "\\'")}')">${escapeHtml(item)}</div>`,
+          )
+          .join("");
+      }
 
-    renderHistory();
-  </script>
-</body>
+      function useHistory(text) {
+        input.value = text;
+        generateQR();
+      }
+
+      function clearHistory() {
+        if (confirm("確定要清除所有歷史紀錄嗎？")) {
+          localStorage.removeItem(STORAGE_KEY);
+          renderHistory();
+        }
+      }
+
+      function escapeHtml(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        return div.innerHTML;
+      }
+
+      input.addEventListener("keydown", function (e) {
+        if (e.key === "Enter") generateQR();
+      });
+
+      renderHistory();
+    </script>
+  </body>
 </html>
